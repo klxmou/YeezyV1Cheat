@@ -1,16 +1,15 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 if game.GameId ~= 6035872082 then return end
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait() and Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LogService = game:GetService("LogService")
-local ScriptContext = game:GetService("ScriptContext")
-local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
-
--- Obfuscation-safe bypass (no string literals)
+-- ====================================================================
+-- ADVANCED SILENT ANTI-CHEAT BYPASS LAYER (HARDENED & UNDETECTED)
+-- ====================================================================
 local oldsetmt = getrenv().setmetatable
+local oldgc = getgc
+local oldhook = hookmetamethod
+local oldhookfunc = hookfunction
+
+-- 1. Metatable/Memory Scanner Camouflage
 getrenv().setmetatable = newcclosure(function(t, mt)
     if mt and typeof(mt) == "table" and rawget(mt, "__mode") == "kv" then
         return oldsetmt({1, 2, 3}, {})
@@ -18,18 +17,56 @@ getrenv().setmetatable = newcclosure(function(t, mt)
     return oldsetmt(t, mt)
 end)
 
-local oldgc = getgc
-getgc = function(...)
+-- 2. Garbage Collection & Registry Cleaning Spoofer (Hides all script signatures)
+local function is_script_closure(f)
+    if typeof(f) ~= "function" then return false end
+    local info = debug.getinfo(f)
+    if info and info.source and (info.source:match("@") or info.source:match("slug") or info.source:match("CoreGui")) then
+        return true
+    end
+    return false
+end
+
+getgc = newcclosure(function(...)
     local g = oldgc(...)
     local r = {}
     for i = 1, #g do
-        if typeof(g[i]) ~= "function" then
-            r[#r+1] = g[i]
+        local v = g[i]
+        if typeof(v) == "function" then
+            if not is_script_closure(v) then
+                table.insert(r, v)
+            end
+        else
+            table.insert(r, v)
         end
     end
     return r
+end)
+
+if getreg then
+    local oldreg = getreg
+    getreg = newcclosure(function(...)
+        local r = oldreg(...)
+        local cleaned = {}
+        for k, v in pairs(r) do
+            if not is_script_closure(v) and not is_script_closure(k) then
+                cleaned[k] = v
+            end
+        end
+        return cleaned
+    end)
 end
 
+-- 3. Cross-Boundary Hook Isolation Guard (Prevents meta-detection of Hooks)
+hookmetamethod = newcclosure(function(obj, method, func)
+    return oldhook(obj, method, newcclosure(func))
+end)
+
+hookfunction = newcclosure(function(old, new)
+    return oldhookfunc(old, newcclosure(new))
+end)
+
+-- 4. ReplicatedFirst / CameraSecurity Active Block
 pcall(function()
     local CameraSecurity = game:GetService("ReplicatedFirst"):WaitForChild("CameraSecurity", 5)
     if CameraSecurity then
@@ -37,13 +74,22 @@ pcall(function()
         if module then
             local mt = getmetatable(module)
             if mt then
-                mt.__index = function(tbl, key) return rawget(tbl, key) end
-                mt.__newindex = function(tbl, key, value) return rawset(tbl, key, value) end
+                mt.__index = newcclosure(function(tbl, key) return rawget(tbl, key) end)
+                mt.__newindex = newcclosure(function(tbl, key, value) return rawset(tbl, key, value) end)
             end
             module.SecurityDisabled = true
         end
     end
 end)
+-- ====================================================================
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait() and Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LogService = game:GetService("LogService")
+local ScriptContext = game:GetService("ScriptContext")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
@@ -103,7 +149,7 @@ CurrentEquipmentState = {
 
 local ConfigFile = "cosmetics.json"
 
--- [FIX] Performance caches
+-- Performance caches
 local CosmeticTypeCache = {}
 local SkinModelCache = {}
 local InfoStatsLabel = nil
@@ -217,12 +263,12 @@ local function BuildCosmeticLists()
     if not CosmeticLibrary then return end
     LoadedCosmetics = {skins = {}, wraps = {}, charms = {}, finishers = {}}
     CosmeticsByWeapon = {}
-    CosmeticTypeCache = {} -- [FIX] Reset cache on rebuild
+    CosmeticTypeCache = {}
 
     for name, data in pairs(CosmeticLibrary.Cosmetics) do
         if type(data) == "table" and data.Type then
             local t = tostring(data.Type):lower()
-            CosmeticTypeCache[name] = t -- [FIX] Cache type
+            CosmeticTypeCache[name] = t
             if t == "skin" then
                 table.insert(LoadedCosmetics.skins, name)
                 local weaponName = data.ItemName
@@ -276,7 +322,6 @@ local function GetWeaponFromSkin(skinName)
     return nil
 end
 
--- [FIX] Cached version of GetCosmeticType
 local function GetCosmeticType(cosmeticName)
     if not cosmeticName or cosmeticName == "NONE_COSMETIC" or cosmeticName == "RANDOM_COSMETIC" then
         return nil
@@ -308,7 +353,6 @@ local function IsCustomEquipped(cosmeticName, weaponName)
     return false
 end
 
--- [FIX] Cached skin model existence check
 local function SkinModelExists(skinName)
     if not skinName then return false end
     local cached = SkinModelCache[skinName]
@@ -369,7 +413,6 @@ local function CreateStatsOverlay()
     local frameCount = 0
     local lastTime = tick()
     local currentFPS = 0
-    -- [FIX] Store connection for cleanup
     StatsRenderConnection = RunService.RenderStepped:Connect(function()
         frameCount = frameCount + 1
         local now = tick()
@@ -400,7 +443,6 @@ local function CreateStatsOverlay()
 end
 
 local function DestroyStatsOverlay()
-    -- [FIX] Disconnect RenderStepped
     if StatsRenderConnection then
         StatsRenderConnection:Disconnect()
         StatsRenderConnection = nil
@@ -412,7 +454,6 @@ local function DestroyStatsOverlay()
     end
 end
 
--- [FIX] Cached ShouldUnlockCosmetic
 local function ShouldUnlockCosmetic(cosmeticName)
     if not cosmeticName then return false end
     local t = CosmeticTypeCache[cosmeticName]
@@ -484,7 +525,6 @@ local function InstallClientItemHook()
                     serialData[dataKey][charmKey] = { Name = customCharm }
                 end
             end
-            -- [FIX] Skip skin redirect for non-local players
             if not isLocalPlayer then
                 _SkipSkinRedirect = true
             end
@@ -519,12 +559,10 @@ local function InstallGetWeaponDataHook()
         PlayerDataUtility.GetWeaponData = function(self, playerData, weaponName)
             local originalData, index = OriginalFunctions.GetWeaponData(self, playerData, weaponName)
 
-            -- [FIX] Skip custom data when processing other players' viewmodels
             if _SkipSkinRedirect then
                 return originalData, index
             end
 
-            -- [FIX] Early return when no custom cosmetics for this weapon
             local wantsSkin = UnlockState.Skins and CustomEquipped.Skins[weaponName]
             local wantsWrap = UnlockState.Wraps and (CustomEquipped.Wraps[weaponName] or CustomEquipped.Wraps["_ALL"])
             local wantsCharm = UnlockState.Charms and (CustomEquipped.Charms[weaponName] or CustomEquipped.Charms["_ALL"])
@@ -597,7 +635,6 @@ local function InstallStaticViewModelHooks()
     if not OriginalFunctions.StaticViewModel_SetWrap then
         OriginalFunctions.StaticViewModel_SetWrap = StaticViewModelModule.SetWrap
         StaticViewModelModule.SetWrap = function(self, wrapData)
-            -- StaticViewModel is equipment UI (always local player)
             local weaponName = self.WeaponName
             local customWrap = nil
             if weaponName and UnlockState.Wraps then
@@ -612,7 +649,6 @@ local function InstallStaticViewModelHooks()
     if not OriginalFunctions.StaticViewModel_SetCharm then
         OriginalFunctions.StaticViewModel_SetCharm = StaticViewModelModule.SetCharm
         StaticViewModelModule.SetCharm = function(self, charmData)
-            -- StaticViewModel is equipment UI (always local player)
             local weaponName = self.WeaponName
             local customCharm = nil
             if weaponName and UnlockState.Charms then
@@ -632,11 +668,9 @@ local function InstallEquipmentStateHooks()
         EquipmentStateModule.SelectCosmetic = function(self, cosmeticName)
             local weaponName = self.SelectedWeapon
             CurrentEquipmentState.Weapon = weaponName
-            CurrentEquipmentState.Type = GetCosmeticType(cosmeticName)  -- Track type accurately
-
-            -- ALWAYS let original equip/save (no blocking!)
+            CurrentEquipmentState.Type = GetCosmeticType(cosmeticName)
             local result = OriginalFunctions.EquipmentState_SelectCosmetic(self, cosmeticName)
-            return result  -- Preserve original return (likely void/table)
+            return result
         end
     end
     if not OriginalFunctions.EquipmentState_SelectWeapon then
@@ -659,13 +693,10 @@ local function InstallCosmeticsModuleHook()
     if not OriginalFunctions.Cosmetics_IsEquipped then
         OriginalFunctions.Cosmetics_IsEquipped = CosmeticsModule._IsEquipped
         CosmeticsModule._IsEquipped = function(self, cosmeticName)
-            -- PRIORITIZE custom equipped (script override)
             local weaponName = self._equipment_state and self._equipment_state.SelectedWeapon or CurrentEquipmentState.Weapon
             if weaponName and cosmeticName and IsCustomEquipped(cosmeticName, weaponName) then
                 return true
             end
-
-            -- FALLBACK to game's original state (locker selections)
             return OriginalFunctions.Cosmetics_IsEquipped(self, cosmeticName)
         end
     end
@@ -751,7 +782,7 @@ local function ApplySkin(skinName, weaponName)
         targetWeapon = cosmeticData.ItemName
     end
     if not targetWeapon then return false end
-    if not SkinModelExists(skinName) then return false end -- [FIX] Cached
+    if not SkinModelExists(skinName) then return false end
     CustomEquipped.Skins[targetWeapon] = skinName
     SaveConfig()
     return true, targetWeapon
@@ -791,7 +822,6 @@ local function ClearAllCustomCosmetics()
     SaveConfig()
 end
 
--- [FIX] Define UpdateStatsLabel
 local lastStatsCount = 0
 local function UpdateStatsLabel()
     if not InfoStatsLabel then return end
@@ -931,6 +961,8 @@ local function InstallSpooferHooks()
         spoofedPlayer = Players.LocalPlayer
     end
     if not spoofedPlayer then return end
+    
+    -- Metamethod hooks are forced context-safe internally via our wrapper
     SpooferOldHook = hookmetamethod(game, "__index", function(self, key)
         if self == spoofedPlayer then
             if key == "Name" then
@@ -991,7 +1023,6 @@ local function StartSpooferRenderLoop()
             platformImg = PlatformImageTable[platform] or ""
             lastPlatform = platform
         end
-        -- nametag platform icon
         local ctrl =
             Players:FindFirstChild(victimName)
             and Players[victimName].Character
@@ -1003,7 +1034,6 @@ local function StartSpooferRenderLoop()
         if ctrl and platformImg ~= "" then
             ctrl.Image = platformImg
         end
-        -- scoreboard container
         local container =
             localPlayer:FindFirstChild("PlayerGui")
             and localPlayer.PlayerGui:FindFirstChild("MainGui")
@@ -1019,7 +1049,6 @@ local function StartSpooferRenderLoop()
                 end
             end
         end
-        -- scores teams
         for _, v in ipairs(
             localPlayer:FindFirstChild("PlayerGui")
             and localPlayer.PlayerGui:FindFirstChild("MainGui")
@@ -1036,7 +1065,6 @@ local function StartSpooferRenderLoop()
                 pcall(function() v.Parent:FindFirstChild("Controls").Image = platformImg end)
             end
         end
-        -- final results
         for _, v in ipairs(
             localPlayer:FindFirstChild("PlayerGui")
             and localPlayer.PlayerGui:FindFirstChild("MainGui")
@@ -1056,7 +1084,6 @@ local function StartSpooferRenderLoop()
                 end
             end
         end
-        -- keys currency
         if keys ~= "" and keys ~= lastKeys then
             for _, v in ipairs(
                 localPlayer:FindFirstChild("PlayerGui")
@@ -1630,7 +1657,6 @@ local WorldState = {
 }
 local ResolutionConnection = nil
 
--- Ensure ColorCorrection exists for Hue
 if not Lighting:FindFirstChild("ColorCorrection") then
     local cc = Instance.new("ColorCorrectionEffect", Lighting)
     cc.Name = "ColorCorrection"
@@ -1765,21 +1791,6 @@ AtmosphereGroup:AddSlider("SkyColorG", {
     end
 })
 
-AtmosphereGroup:AddSlider("SkyColorG", {
-    Text = "Green",
-    Min = 0,
-    Max = 255,
-    Default = 170,
-    Rounding = 0,
-    Callback = function(Value)
-        if not WorldState.MasterEnabled then return end
-        local atm = GetOrCreateAtmosphere()
-        local r = atm.Color.R * 255
-        local b = atm.Color.B * 255
-        atm.Color = Color3.fromRGB(r, Value, b)
-    end
-})
-
 AtmosphereGroup:AddSlider("SkyColorB", {
     Text = "Blue",
     Min = 0,
@@ -1867,7 +1878,7 @@ ResolutionGroup:AddButton({
         if ResolutionConnection then
             ResolutionConnection:Disconnect()
             ResolutionConnection = nil
-            end
+        end
     end
 })
 
@@ -2018,7 +2029,6 @@ local function UpdateESP()
 
                                     local boxColor = isEnemy and ESPState.EnemyColor or ESPState.BoxColor
 
-                                    -- Update Box Outline
                                     if ESPState.Boxes and objects.BoxOutline then
                                         objects.BoxOutline.Size = Vector2.new(boxWidth + 4, boxHeight + 4)
                                         objects.BoxOutline.Position = Vector2.new(pos.X - (boxWidth + 4) / 2, topPos.Y - 2)
@@ -2027,7 +2037,6 @@ local function UpdateESP()
                                         objects.BoxOutline.Visible = false
                                     end
 
-                                    -- Update Box
                                     if ESPState.Boxes and objects.Box then
                                         objects.Box.Size = Vector2.new(boxWidth, boxHeight)
                                         objects.Box.Position = Vector2.new(pos.X - boxWidth / 2, topPos.Y)
@@ -2038,7 +2047,6 @@ local function UpdateESP()
                                         objects.Box.Visible = false
                                     end
 
-                                    -- Update Name
                                     if ESPState.Names and objects.Name then
                                         local displayName = player.Name
                                         if ESPState.ShowDistance then
@@ -2052,7 +2060,6 @@ local function UpdateESP()
                                         objects.Name.Visible = false
                                     end
 
-                                    -- Update Tracer
                                     if ESPState.Tracers and objects.Tracer then
                                         local tracerOriginY = camera.ViewportSize.Y
                                         if ESPState.TracerPosition == "Top" then
@@ -2068,7 +2075,6 @@ local function UpdateESP()
                                         objects.Tracer.Visible = false
                                     end
 
-                                    -- Update Health Bar
                                     if ESPState.HealthBar and objects.HealthBar and objects.HealthBarOutline then
                                         local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
                                         local barHeight = math.max(4, boxHeight * healthPercent)
@@ -3057,17 +3063,15 @@ MenuGroup:AddLabel("Menu bind")
 
 Library.ToggleKeybind = Options.MenuKeybind
 
--- UPGRADED INIT (AUTOLOAD & SILENTLOAD)
+-- INITIALIZATION
 task.spawn(function()
     LoadGameModules()
     BuildCosmeticLists()
     PlayerDataController:WaitUntilLoaded()
     CreateStatsOverlay()
     
-    -- Silent loading config
     LoadConfig()
     
-    -- Auto-forcing true autoloading states in filesystem for server hops
     if writefile and makefolder then
         pcall(function()
             EnsureFolder()

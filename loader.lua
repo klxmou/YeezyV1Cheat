@@ -70,6 +70,35 @@ pcall(function()
 end)
 -- ====================================================================
 
+local function applyBypass()
+    task.spawn(function()
+        xpcall(function()
+            local blockedNames = {"anticheat", "ac", "security", "detection", "monitor"}
+            local function blockScript(obj)
+                if obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+                    local n=obj.Name:lower()
+                    for _,ac in pairs(blockedNames) do
+                        if n:find(ac) then xpcall(function() obj.Disabled=true end, function() end); break end
+                    end
+                end
+            end
+            for _,obj in pairs(game:GetDescendants()) do blockScript(obj) end
+            game.DescendantAdded:Connect(blockScript)
+        end, function() end)
+        xpcall(function()
+            local networkClient=game:GetService("NetworkClient")
+            if networkClient then
+                networkClient.ChildAdded:Connect(function(child)
+                    local n=child.Name:lower()
+                    if n:find("telemetry") or n:find("log") or n:find("report") then
+                        xpcall(function() child:Destroy() end, function() end)
+                    end
+                end)
+            end
+        end, function() end)
+    end)
+end
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait() and Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -220,7 +249,7 @@ local function LoadGlobalSettings()
 end
 
 -- ============================================
--- AIMBOT & TRIGGERBOT MODULES (FIXED & SNIPER SCOPE CHECK)
+-- AIMBOT & TRIGGERBOT MODULES
 -- ============================================
 local AimbotState = {
     Enabled = false, Keybind = "E", KeybindMode = "Hold", ToggleAiming = false, Smoothness = 4, FOV = 150, MaxDistance = 1000, 
@@ -230,7 +259,7 @@ local AimbotState = {
 local TriggerbotState = {
     Enabled = false, Mode = "Always", ToggleActive = false, Keybind = "V", TargetPart = "Head", TeamCheck = true, WallCheck = true, 
     MaxDistance = 1000, CrosshairRadius = 25, Delay = 0, RandomDelay = false, MinDelay = 20, MaxDelay = 90, LastFire = 0, NextFire = 0,
-    RequireScope = false -- Dynamic Sniper / Crossbow variable
+    RequireScope = false
 }
 local AimbotConnection, FOVCircle, SnapLine, TriggerbotConnection = nil, nil, nil, nil
 
@@ -248,7 +277,6 @@ local function IsKeyHeld(key)
     return false
 end
 
--- Fixed Rivals Bounding Team Verification Check
 local function IsOnEnemyTeam(targetPlayer)
     if not AimbotState.TeamCheck then return true end
     if targetPlayer.Team ~= LocalPlayer.Team then return true end
@@ -258,7 +286,6 @@ local function IsOnEnemyTeam(targetPlayer)
     return false
 end
 
--- Dynamic Field-Of-View Sniper Checking Architecture
 local function IsSniperScoped()
     if not TriggerbotState.RequireScope then return true end
     local camera = workspace.CurrentCamera
@@ -307,7 +334,6 @@ local function GetClosestPlayer()
     return closest
 end
 
--- Fixed mousemoverel native delta scaling
 local function AimAt(target)
     if not target or not mousemoverel then return end
     local camera = workspace.CurrentCamera
@@ -405,9 +431,7 @@ local function UpdateTriggerbot()
     if TriggerbotState.Mode == "Hold" and not IsKeyHeld(TriggerbotState.Keybind) then return end
     if TriggerbotState.Mode == "Toggle" and not TriggerbotState.ToggleActive then return end
     
-    -- sniper/crossbow scope gate bypass check
     if not IsSniperScoped() then return end
-    
     if tick() < TriggerbotState.NextFire then return end
     
     local targetPart = GetTriggerbotTarget()
@@ -423,7 +447,7 @@ local function UpdateTriggerbot()
 end
 
 -- ============================================
--- VISUALS TAB MODULES (CLEAN REBUILT EXPANDED ESP)
+-- VISUALS TAB MODULES
 -- ============================================
 local ESPState = { 
     Enabled = false, Boxes = true, BoxFilled = false, Names = true, ShowDistance = true, TeamCheck = false, 
@@ -458,7 +482,6 @@ local function CreateESPObjects(player)
         HealthBarOutline = Drawing.new("Square"),
         HealthBar = Drawing.new("Square")
     }
-    -- Initialize styles cleanly
     local objs = ESPObjects[player]
     objs.BoxOutline.Thickness = 3
     objs.BoxOutline.Filled = false
@@ -509,7 +532,6 @@ local function UpdateESP()
                             objs = ESPObjects[player]
                         end
                         
-                        -- Height / dynamic box extraction calculation
                         local head = character:FindFirstChild("Head")
                         local topPos = camera:WorldToViewportPoint(head and head.Position + Vector3.new(0, 0.5, 0) or hrp.Position + Vector3.new(0, 3, 0))
                         local bottomPos = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3.2, 0))
@@ -543,7 +565,6 @@ local function UpdateESP()
                             objs.Name.Visible = false
                         end
                         
-                        -- Precision side health bar compilation
                         local healthPct = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
                         local barX = pos.X - boxWidth/2 - 6
                         local barY = topPos.Y
@@ -578,7 +599,6 @@ local function StopESP()
     ClearESP() 
 end
 
--- Profile save infrastructure utilities
 local function SaveConfig(name)
     local targetName = name or CurrentConfigName
     local config = { CustomEquipped = CustomEquipped, UnlockState = UnlockState, SpooferState = SpooferState, UISettings = UISettings }
@@ -837,8 +857,12 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- ============================================
+-- CRITICAL CONFIG-FIRST COMPLIANT INITIALIZATION
+-- ============================================
 task.spawn(function()
     EnsureFolder()
+    applyBypass()
     LoadGlobalSettings()
     LoadGameModules()
     BuildCosmeticLists()
